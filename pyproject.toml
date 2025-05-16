@@ -1,0 +1,35 @@
+[tool.poetry]
+name = "skey"
+version = "0.1.0"
+description = ""
+authors = ["Yuexuan Kong <ykong@deezer.com>"]
+packages = [
+    { include = "skey" }
+]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "3.10.*"
+numpy = "<1.24"
+torch = "2.0.0"
+torchaudio = "2.0.1"
+tqdm = "4.65.*"
+einops = "0.6.*"
+nnAudio = "0.3.2"
+
+[tool.poetry.group.dev.dependencies]
+ipython = "8.12.*"
+black = "*"
+isort = "*"
+pdbr = "*"
+
+[tool.isort]
+profile = "black"
+multi_line_output = 3
+
+[tool.poetry.scripts]
+skey = "skey.cli:main"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
