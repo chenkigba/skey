@@ -18,7 +18,7 @@
 ## Installation
 
 ```bash
-pip install skey
+pip install .
 ```
 
 ## Usage
