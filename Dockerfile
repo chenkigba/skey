@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04
+FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
 
 RUN apt-get update -y && DEBIAN_FRONTEND=noninteractive apt-get install -y \
     # Install python 3.10 (Note: default in an Ubuntu 22.04 image), and other tools if needed
