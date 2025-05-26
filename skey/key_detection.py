@@ -162,7 +162,7 @@ def key_detection(ckpt_path: str, audio_dir: str, extension: str = "wav", device
     print(f"\n🔑 Computing key for {len(audio_files)} audio files on {device}...\n")
 
     results = {
-        path: infer_key(hcqt, chromanet, crop_fn, audio, device).cpu().numpy()
+        path: infer_key(hcqt, chromanet, crop_fn, audio, device)
         for audio, path in tqdm(dataset, desc="Processing")
     }
 
