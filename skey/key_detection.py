@@ -42,7 +42,7 @@ key_map = {
 }
 
 
-def download_checkpoint_if_missing(path: str = "~/.cache/skey/skey.pt"):
+def download_checkpoint_if_missing(path: str = "./skey.pt"):
     path = os.path.expanduser(path)
     if not os.path.exists(path):
         print("Checkpoint not found. Downloading from GitHub...")
