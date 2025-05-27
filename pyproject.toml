@@ -9,16 +9,15 @@ packages = [
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "3.10.*"
+python = "^3.10, <3.12"
 numpy = "<1.24"
 torch = "2.4.0"
-torchaudio = "2.4.0"
 tqdm = "4.65.*"
 einops = "0.6.*"
 nnAudio = "0.3.2"
+librosa = "^0.11.0"
 
 [tool.poetry.group.dev.dependencies]
-ipython = "8.12.*"
 black = "*"
 isort = "*"
 pdbr = "*"

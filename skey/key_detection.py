@@ -1,12 +1,13 @@
-import os
 import glob
 import logging
+import os
+import urllib.request
+from typing import Any, Dict, Iterator, List, Tuple
+
+import librosa
 import numpy as np
 import torch
-import torchaudio
-import urllib.request
 from tqdm import tqdm
-from typing import Any, Dict, List, Tuple, Iterator
 
 from .src.chromanet import ChromaNet
 from .src.hcqt import VQT, CropCQT
@@ -14,31 +15,31 @@ from .src.hcqt import VQT, CropCQT
 logging.basicConfig(level=logging.INFO)
 
 key_map = {
-         0: 'A Major',
-         1: 'Bb Major',
-         2: 'B Major',
-         3: 'C Major',
-         4: 'C# Major',
-         5: 'D Major',
-         6: 'D# Major',
-         7: 'E Major',
-         8: 'F Major',
-         9: 'F# Major',
-         10: 'G Major',
-         11: 'G# Major',
-         12: 'B minor',
-         13: 'C minor',
-         14: 'C# minor',
-         15: 'D minor',
-         16: 'D# minor',
-         17: 'E minor',
-         18: 'F minor',
-         19: 'F# minor',
-         20: 'G minor',
-         21: 'G# minor',
-         22: 'A minor',
-         23: 'Bb minor'
-         }
+    0: "A Major",
+    1: "Bb Major",
+    2: "B Major",
+    3: "C Major",
+    4: "C# Major",
+    5: "D Major",
+    6: "D# Major",
+    7: "E Major",
+    8: "F Major",
+    9: "F# Major",
+    10: "G Major",
+    11: "G# Major",
+    12: "B minor",
+    13: "C minor",
+    14: "C# minor",
+    15: "D minor",
+    16: "D# minor",
+    17: "E minor",
+    18: "F minor",
+    19: "F# minor",
+    20: "G minor",
+    21: "G# minor",
+    22: "A minor",
+    23: "Bb minor",
+}
 
 
 def download_checkpoint_if_missing(path: str = "~/.cache/skey/skey.pt"):
@@ -51,24 +52,27 @@ def download_checkpoint_if_missing(path: str = "~/.cache/skey/skey.pt"):
         print(f"✅ Checkpoint downloaded to {path}")
     return path
 
+
 def yield_audio_paths(paths: List[str]) -> Iterator[Dict[str, Any]]:
     for idx in np.random.permutation(len(paths)):
         yield {"idx": idx, "song_path": paths[idx]}
 
 
-def load_audio(song_path: str, sr: int, mono: bool = True, normalize: bool = True) -> torch.Tensor:
+def load_audio(
+    song_path: str, sr: float, mono: bool = True, normalize: bool = True
+) -> torch.Tensor:
     try:
-        waveform, sr_in = torchaudio.load(song_path)
+        waveform_np, sr = librosa.load(song_path, sr=sr, mono=mono)
     except Exception as e:
         logging.warning(f"Failed to load {song_path}: {e}")
         return torch.zeros(1, 1)
 
-    if sr_in != sr:
-        resample = torchaudio.transforms.Resample(orig_freq=sr_in, new_freq=sr)
-        waveform = resample(waveform)
+    if waveform_np.ndim == 1:
+        waveform_np = np.expand_dims(waveform_np, axis=0)
+    if mono:
+        waveform_np = np.mean(waveform_np, axis=0, keepdims=True)
 
-    if mono and waveform.shape[0] > 1:
-        waveform = torch.mean(waveform, dim=0, keepdim=True)
+    waveform = torch.from_numpy(waveform_np).float()
 
     if normalize:
         max_val = torch.max(torch.abs(waveform))
@@ -76,6 +80,7 @@ def load_audio(song_path: str, sr: int, mono: bool = True, normalize: bool = Tru
             waveform = waveform / max_val
 
     return waveform
+
 
 class AudioDataset(torch.utils.data.IterableDataset):
     def __init__(self, paths: List[str], sr: int, device: torch.device):
@@ -90,7 +95,9 @@ class AudioDataset(torch.utils.data.IterableDataset):
                 yield audio, data["song_path"]
 
 
-def load_model_components(ckpt: Dict[str, Any], device: torch.device) -> Tuple[VQT, ChromaNet, CropCQT]:
+def load_model_components(
+    ckpt: Dict[str, Any], device: torch.device
+) -> Tuple[VQT, ChromaNet, CropCQT]:
     hcqt = VQT(
         harmonics=[1],
         fmin=27.5,
@@ -105,13 +112,17 @@ def load_model_components(ckpt: Dict[str, Any], device: torch.device) -> Tuple[V
         temperature=1,
     ).to(device)
 
-    hcqt.load_state_dict({
-        k.replace("hcqt.", ""): v for k, v in ckpt["stone"].items() if "hcqt" in k
-    })
+    hcqt.load_state_dict(
+        {k.replace("hcqt.", ""): v for k, v in ckpt["stone"].items() if "hcqt" in k}
+    )
 
-    chromanet.load_state_dict({
-        k.replace("chromanet.", ""): v for k, v in ckpt["stone"].items() if "chromanet" in k
-    })
+    chromanet.load_state_dict(
+        {
+            k.replace("chromanet.", ""): v
+            for k, v in ckpt["stone"].items()
+            if "chromanet" in k
+        }
+    )
 
     hcqt.eval()
     chromanet.eval()
@@ -124,7 +135,7 @@ def infer_key(
     chromanet: ChromaNet,
     crop_fn: CropCQT,
     batch: torch.Tensor,
-    device: torch.device
+    device: torch.device,
 ) -> str:
     new_batch = batch.unsqueeze(0).to(device)
     try:
@@ -142,27 +153,33 @@ def load_checkpoint(path: str) -> Dict[str, Any]:
     return torch.load(path, map_location="cpu")
 
 
-def key_detection(ckpt_path: str, audio_dir: str, extension: str = "wav", device: str = "cpu") -> None:
-    if device != "cpu" and not torch.cuda.is_available():
-        logging.warning("CUDA not available. Falling back to CPU.")
+def key_detection(
+    ckpt_path: str, audio_dir: str, extension: str = "wav", device: str = "cpu"
+) -> None:
+    if (
+        device != "cpu"
+        and not torch.cuda.is_available()
+        and not torch.backends.mps.is_available()
+    ):
+        logging.warning("CUDA and MPS not available. Falling back to CPU.")
         device = "cpu"
 
-    device = torch.device(device)
+    d = torch.device(device)
     if ckpt_path.lower() == "auto":
         ckpt_path = download_checkpoint_if_missing()
     ckpt = load_checkpoint(ckpt_path)
     sr = ckpt["audio"]["sr"]
     model_name = "-".join(ckpt_path.split("/")[-5:-1])
 
-    hcqt, chromanet, crop_fn = load_model_components(ckpt, device)
+    hcqt, chromanet, crop_fn = load_model_components(ckpt, d)
 
     audio_files = glob.glob(f"{audio_dir}/**/*.{extension}", recursive=True)
-    dataset = AudioDataset(audio_files, sr, device)
+    dataset = AudioDataset(audio_files, sr, d)
 
-    print(f"\n🔑 Computing key for {len(audio_files)} audio files on {device}...\n")
+    print(f"\n🔑 Computing key for {len(audio_files)} audio files on {d}...\n")
 
     results = {
-        path: infer_key(hcqt, chromanet, crop_fn, audio, device)
+        path: infer_key(hcqt, chromanet, crop_fn, audio, d)
         for audio, path in tqdm(dataset, desc="Processing")
     }
 

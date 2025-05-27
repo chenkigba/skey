@@ -1,12 +1,13 @@
 from typing import List
 from torch import nn
-from skey.src.model.convnext import ConvNeXtBlock, TimeDownsamplingBlock
+from skey.src.convnext import ConvNeXtBlock, TimeDownsamplingBlock
 from einops import rearrange
 
 
 class OctavePool(nn.Module):
     r"""Average log-frequency axis across octaves, thus producing a chromagram."""
-    def __init__(self, bins_per_octave):
+
+    def __init__(self, bins_per_octave: int):
         super().__init__()
         self.bins_per_octave = bins_per_octave
 
@@ -16,14 +17,16 @@ class OctavePool(nn.Module):
         x = x.mean(dim=3)
         return x
 
+
 class ChromaNet(nn.Module):
-    def __init__(self,
-                 n_bins: int,
-                 n_harmonics: int,
-                 out_channels: List[int],
-                 kernels: List[int],
-                 temperature: float,
-                 ):
+    def __init__(
+        self,
+        n_bins: int,
+        n_harmonics: int,
+        out_channels: List[int],
+        kernels: List[int],
+        temperature: float,
+    ):
         super().__init__()
         assert len(kernels) == len(out_channels)
         self.n_harmonics = n_harmonics
@@ -38,7 +41,13 @@ class ChromaNet(nn.Module):
         for i, out_channel in enumerate(self.out_channels):
             time_downsampling_block = TimeDownsamplingBlock(in_channel, out_channel)
             kernel = self.kernels[i]
-            convnext_block = ConvNeXtBlock(out_channel, out_channel, kernel_size=kernel, padding=kernel//2, drop_path = self.drop_path)
+            convnext_block = ConvNeXtBlock(
+                out_channel,
+                out_channel,
+                kernel_size=kernel,
+                padding=kernel // 2,
+                drop_path=self.drop_path,
+            )
             time_downsampling_blocks.append(time_downsampling_block)
             convnext_blocks.append(convnext_block)
             in_channel = out_channel
@@ -61,7 +70,7 @@ class ChromaNet(nn.Module):
         x = self.classifier(x)
         x = self.batch_norm(x)
         x = self.flatten(x)
-        x = self.softmax(x/self.temperature)
+        x = self.softmax(x / self.temperature)
         assert x.shape[1] == 24
 
         return x

@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 
+
 class DropPath(nn.Module):
     r"""Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks)."""
 
@@ -35,10 +36,23 @@ class ConvNeXtBlock(nn.Module):
         layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
     """
 
-    def __init__(self, in_channels, out_channels, kernel_size=7, padding=3, drop_path=0.1, layer_scale_init_value=1e-1):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size=7,
+        padding=3,
+        drop_path=0.1,
+        layer_scale_init_value=1e-1,
+    ):
         super().__init__()
         self.dwconv = nn.Conv2d(
-            in_channels, out_channels, kernel_size=kernel_size, padding=padding, groups=in_channels, padding_mode="replicate"
+            in_channels,
+            out_channels,
+            kernel_size=kernel_size,
+            padding=padding,
+            groups=in_channels,
+            padding_mode="replicate",
         )  # depthwise conv
         self.norm = nn.functional.layer_norm
         self.pwconv1 = nn.Linear(
@@ -47,7 +61,9 @@ class ConvNeXtBlock(nn.Module):
         self.act = nn.GELU()
         self.pwconv2 = nn.Linear(4 * out_channels, in_channels)
         self.gamma = (
-            nn.Parameter(layer_scale_init_value * torch.ones((out_channels)), requires_grad=True)
+            nn.Parameter(
+                layer_scale_init_value * torch.ones((out_channels)), requires_grad=True
+            )
             if layer_scale_init_value > 0
             else None
         )
@@ -71,6 +87,7 @@ class ConvNeXtBlock(nn.Module):
 
 class TimeDownsamplingBlock(nn.Module):
     r"""Time Downsampling Block: LayerNorm -> 1x2 strided Conv -> GELU."""
+
     def __init__(self, in_channels, out_channels, bias=True):
         super().__init__()
         self.norm = nn.functional.layer_norm
