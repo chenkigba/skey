@@ -5,8 +5,21 @@ from einops import rearrange
 
 
 class OctavePool(nn.Module):
-    r"""Average log-frequency axis across octaves, thus producing a chromagram."""
+    r"""
+    Average log-frequency axis across octaves, thus producing a chromagram.
 
+    Args:
+        bins_per_octave (int): Number of frequency bins per octave.
+
+    Forward:
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, channel, H, W), 
+                        where H is the height representing frequency bins.
+
+        Returns:
+            Tensor: Output tensor of shape (batch_size, channel, bins_per_octave, W), 
+                    where the frequency axis is averaged across octaves.
+    """
     def __init__(self, bins_per_octave: int):
         super().__init__()
         self.bins_per_octave = bins_per_octave
@@ -19,6 +32,23 @@ class OctavePool(nn.Module):
 
 
 class ChromaNet(nn.Module):
+    """
+    ChromaNet is a neural network proposed in paper STONE (ISMIR 2024).
+
+    Args:
+        n_bins (int): Number of frequency bins in the input.
+        n_harmonics (int): Number of harmonics in the input.
+        out_channels (List[int]): List of output channels for each layer.
+        kernels (List[int]): List of kernel sizes for each layer.
+        temperature (float): Temperature parameter for softmax scaling.
+
+    Forward:
+        Args:
+            x (Tensor): Input tensor of shape (batch_size, n_harmonics, n_bins, time_steps).
+
+        Returns:
+            Tensor: Output tensor of shape (batch_size, 24), representing the processed chroma features.
+    """
     def __init__(
         self,
         n_bins: int,

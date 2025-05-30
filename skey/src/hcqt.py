@@ -49,6 +49,23 @@ class VQT(nnAudio.features.vqt.VQT):
 
 
 class CropCQT(torch.nn.Module):
+    """
+    A PyTorch module for cropping Constant-Q Transform (CQT) spectrograms.
+
+    Args:
+        height (int): The height of the cropped spectrogram.
+
+    Methods:
+        forward(spectrograms, transpose):
+            Crops the input spectrograms based on the provided transpose values.
+
+            Args:
+                spectrograms (torch.Tensor): A batch of spectrograms to be cropped.
+                transpose (torch.Tensor): A tensor containing the starting indices for cropping.
+
+            Returns:
+                torch.Tensor: A batch of cropped spectrograms.
+    """
     def __init__(self, height: int):
         super(CropCQT, self).__init__()
         self.height = height

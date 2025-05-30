@@ -1,9 +1,15 @@
+# Code originally provided by Meta FAIR. https://github.com/facebookresearch/ConvNeXt
 import torch
 from torch import nn
 
 
 class DropPath(nn.Module):
-    r"""Drop paths (Stochastic Depth) per sample  (when applied in main path of residual blocks)."""
+    r"""Drop paths (Stochastic Depth) per sample (when applied in main path of residual blocks).
+
+    Args:
+        drop_prob (float): Probability of dropping a path. Default: 0.0.
+        scale_by_keep (bool): Whether to scale the output by the keep probability. Default: True.
+    """
 
     def __init__(self, drop_prob: float = 0.0, scale_by_keep: bool = True):
         super(DropPath, self).__init__()
@@ -28,12 +34,15 @@ class ConvNeXtBlock(nn.Module):
     r"""ConvNeXt Block. There are two equivalent implementations:
     (1) DwConv -> LayerNorm (channels_first) -> 1x1 Conv -> GELU -> 1x1 Conv; all in (N, C, H, W)
     (2) DwConv -> Permute to (N, H, W, C); LayerNorm (channels_last) -> Linear -> GELU -> Linear; Permute back
-    We use (2) as we find it slightly faster in PyTorch
+    We use (2) as we find it slightly faster in PyTorch.
 
     Args:
-        dim (int): Number of input channels.
-        drop_path (float): Stochastic depth rate. Default: 0.0
-        layer_scale_init_value (float): Init value for Layer Scale. Default: 1e-6.
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        kernel_size (int): Size of the convolution kernel. Default: 7.
+        padding (int): Padding size for the convolution. Default: 3.
+        drop_path (float): Stochastic depth rate. Default: 0.1.
+        layer_scale_init_value (float): Initial value for Layer Scale. Default: 1e-1.
     """
 
     def __init__(
@@ -86,7 +95,13 @@ class ConvNeXtBlock(nn.Module):
 
 
 class TimeDownsamplingBlock(nn.Module):
-    r"""Time Downsampling Block: LayerNorm -> 1x2 strided Conv -> GELU."""
+    r"""Time Downsampling Block: LayerNorm -> 1x2 strided Conv -> GELU.
+
+    Args:
+        in_channels (int): Number of input channels.
+        out_channels (int): Number of output channels.
+        bias (bool): Whether to use bias in the convolution. Default: True.
+    """
 
     def __init__(self, in_channels, out_channels, bias=True):
         super().__init__()
