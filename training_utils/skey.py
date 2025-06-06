@@ -1,10 +1,10 @@
-from typing import Any, List, Tuple, Union, Dict
+from typing import List, Tuple
 
 import torch
 from torch import Tensor
 
-from skey.src.model.chromanet import ChromaNet, OctavePool
-from skey.src.model.hcqt import VQT, CropCQT
+from skey.chromanet import ChromaNet, OctavePool
+from skey.hcqt import VQT, CropCQT
 
 
 class Stone(torch.nn.Module):
@@ -25,9 +25,7 @@ class Stone(torch.nn.Module):
         self.bins_before_crop = hcqt.n_bins
         self.out_channels = out_channels
         self.kernels = kernels
-        self.chromanet = ChromaNet(
-            self.n_bins, self.n_harmonics, self.out_channels, self.kernels, temperature
-        )
+        self.chromanet = ChromaNet(self.n_bins, self.n_harmonics, self.out_channels, self.kernels, temperature)
         self.octave_pool = OctavePool(12)
 
     def forward(self, x: dict) -> Tuple[Tensor, Tensor, Tensor]:
@@ -51,15 +49,11 @@ class Stone(torch.nn.Module):
 
         # crop CQT
         stack_original = crop_fn(stack_hcqt, torch.cat((original, original), dim=0))
-        mean_hcqt = self.octave_pool(
-            torch.mean(stack_original, dim=3).unsqueeze(axis=3)
-        ).squeeze()
+        mean_hcqt = self.octave_pool(torch.mean(stack_original, dim=3).unsqueeze(axis=3)).squeeze()
         mean_hcqt = (mean_hcqt[:batch] + mean_hcqt[batch:]) / 2
 
         source_transpose = crop_fn(stack_hcqt[:batch, ...], transpose)
-        stack_input = torch.cat(
-            (stack_original, source_transpose), dim=0
-        )  # torch.Size([384, 1, 84, 646])
+        stack_input = torch.cat((stack_original, source_transpose), dim=0)  # torch.Size([384, 1, 84, 646])
         y = self.chromanet(stack_input)  # (384, 1, 12)
 
         return (y, difference, mean_hcqt)

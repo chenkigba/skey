@@ -1,11 +1,9 @@
-from typing import Any, Callable, Dict, List, Tuple, Union
+from typing import Callable, Dict, List, Tuple, Union
 
 import torch
 import torch.nn as nn
 
-log_clap: Callable[[torch.Tensor], torch.Tensor] = lambda x: torch.clamp(
-    torch.log(x), min=-100
-)
+log_clap: Callable[[torch.Tensor], torch.Tensor] = lambda x: torch.clamp(torch.log(x), min=-100)
 
 
 class Z_transformation(torch.nn.Module):
@@ -43,9 +41,7 @@ class CrossPowerSpectralDensityLoss(nn.Module):
         batch_size = int(y.shape[0] / 3)
 
         # calculate m, value for mode, vertical summation
-        channel_1, channel_2 = torch.split(
-            y, 12, dim=1
-        )  # [n_views*batch+equivariant, 12]
+        channel_1, channel_2 = torch.split(y, 12, dim=1)  # [n_views*batch+equivariant, 12]
         m1 = torch.sum(channel_1, dim=1)  # sum of mode per data point in the batch
 
         # for 3 views
@@ -65,33 +61,23 @@ class CrossPowerSpectralDensityLoss(nn.Module):
         # distribution loss: balance distribution of major and minor modes predictions
         sum_1 = torch.sum(channel_1[: 2 * batch_size])
         sum_2 = torch.sum(channel_2[: 2 * batch_size])
-        loss_distribution = (sum_1 / (2 * batch_size) - 0.5) * (
-            0.5 - sum_2 / (2 * batch_size)
-        )  # maximum is 0.25
+        loss_distribution = (sum_1 / (2 * batch_size) - 0.5) * (0.5 - sum_2 / (2 * batch_size))  # maximum is 0.25
         # loss_distribution = 0
 
         # label the data by the cqt bin energy comparaison
         with torch.no_grad():
-            key_signature = (
-                (y[:batch_size] + y[batch_size : 2 * batch_size]) / 2
-            ).argmax(axis=1)
+            key_signature = ((y[:batch_size] + y[batch_size : 2 * batch_size]) / 2).argmax(axis=1)
             root_bin = (key_signature + 3) % 12
-            majorminor = torch.gather(
-                mean_hcqt, 1, key_signature.unsqueeze(axis=1)
-            ) > torch.gather(mean_hcqt, 1, root_bin.unsqueeze(axis=1))
+            majorminor = torch.gather(mean_hcqt, 1, key_signature.unsqueeze(axis=1)) > torch.gather(
+                mean_hcqt, 1, root_bin.unsqueeze(axis=1)
+            )
             feat_eng_mode = majorminor.int().squeeze()
 
         # loss calculation
         loss_pos = (1 - z1 * z2.conj()).abs().pow(2).mean()
         loss_equivariant_1 = (
             (
-                torch.exp(
-                    1j
-                    * 2
-                    * torch.pi
-                    * self.z_transformation.omega
-                    * difference.to(self.z_transformation.device)
-                )
+                torch.exp(1j * 2 * torch.pi * self.z_transformation.omega * difference.to(self.z_transformation.device))
                 - z1 * z3.conj()
             )
             .abs()
@@ -100,13 +86,7 @@ class CrossPowerSpectralDensityLoss(nn.Module):
         )
         loss_equivariant_2 = (
             (
-                torch.exp(
-                    1j
-                    * 2
-                    * torch.pi
-                    * self.z_transformation.omega
-                    * difference.to(self.z_transformation.device)
-                )
+                torch.exp(1j * 2 * torch.pi * self.z_transformation.omega * difference.to(self.z_transformation.device))
                 - z2 * z3.conj()
             )
             .abs()
@@ -116,27 +96,14 @@ class CrossPowerSpectralDensityLoss(nn.Module):
         loss_key = loss_pos + loss_equivariant_1 + loss_equivariant_2
 
         loss_mode = (
-            (
-                -feat_eng_mode * log_clap(m1_equivariant)
-                - (1 - feat_eng_mode) * log_clap(1 - m1_equivariant)
-            ).mean()
-            + (
-                -feat_eng_mode * log_clap(m1_source2)
-                - (1 - feat_eng_mode) * log_clap(1 - m1_source2)
-            ).mean()
-            + (
-                -feat_eng_mode * log_clap(m1_source1)
-                - (1 - feat_eng_mode) * log_clap(1 - m1_source1)
-            ).mean()
+            (-feat_eng_mode * log_clap(m1_equivariant) - (1 - feat_eng_mode) * log_clap(1 - m1_equivariant)).mean()
+            + (-feat_eng_mode * log_clap(m1_source2) - (1 - feat_eng_mode) * log_clap(1 - m1_source2)).mean()
+            + (-feat_eng_mode * log_clap(m1_source1) - (1 - feat_eng_mode) * log_clap(1 - m1_source1)).mean()
         )
 
         w_key, w_mode, w_distribution = self.weights
 
-        loss = (
-            w_key * loss_key
-            + w_mode * 1.5 * loss_mode
-            + w_distribution * 20 * loss_distribution
-        )
+        loss = w_key * loss_key + w_mode * 1.5 * loss_mode + w_distribution * 20 * loss_distribution
 
         return {
             "loss": loss,
