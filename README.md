@@ -26,26 +26,31 @@ pip install .
 ### 🔧 Command Line Interface (CLI)
 
 ```bash
-skey auto path/to/audio_dir --ext mp3 --device cpu
+skey path/to/audio_dir --checkpoint path/to/model.pt --ext mp3 --device cpu
+```
+
+If `--checkpoint` is not provided, the default model will be used.
+
+```bash
+skey path/to/audio_dir --ext mp3 --device cpu
 ```
 
 **Arguments**:
 
 | Argument                | Description                                               |
 | ----------------------- | --------------------------------------------------------- |
-| `auto` or path to `.pt` | `"auto"` will download the pretrained model automatically to path `~/.cache/skey/skey.pt` |
-| `path/to/audio_dir`     | Directory of audio files to analyze                       |
-| `--ext`                 | Audio file extension (default: `wav`, supports all formats that can be read by torchaudio)                     |
-| `--device`              | Device to run on (default: `cpu`)                  |
+| `path/to/audio_dir`     | Path to directory with audio files or a single audio file |
+| `--checkpoint`          | Path to model checkpoint (`.pt`). Loads default if not provided. |
+| `--ext`                 | Audio file extension (default: `wav`, supports all formats that can be read by torchaudio) if `path/to/audio_dir` is a directory |
+| `--device`              | Device to run on (default: `cpu`, e.g., `cuda`, `mps`)                  |
 
 
 ### 🐍 Python API
 
 ```python
-from skey.key_detection import key_detection
+from skey import detect_key
 
-key_detection(
-    ckpt_path="auto",  # or "path/to/skey.pt"
+detect_key(
     audio_dir="path/to/audio_dir",
     extension="mp3",
     device="cpu"
@@ -54,10 +59,10 @@ key_detection(
 
 **Parameters**:
 
-* `ckpt_path` (str): Use `"auto"` to download checkpoint or provide a local `.pt` file
-* `audio_dir` (str): Directory with audio files
-* `extension` (str): File extension (default: `"wav"`)
-* `device` (str): Device to run on (default: `cpu`)
+* `audio_dir` (str): Path to the audio file or directory containing audio files
+* `ckpt_path` (str or None, optional): Path to the model checkpoint file. If `None`, the default model is used.
+* `extension` (str, optional): File extension (default: `"wav"`)
+* `device` (str, optional): Device to run on (default: `cpu`)
 
 ## 🗂️ Code organization
 

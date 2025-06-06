@@ -27,7 +27,7 @@ class DropPath(nn.Module):
         return x * random_tensor
 
     def extra_repr(self):
-        return f"drop_prob={round(self.drop_prob,3):0.3f}"
+        return f"drop_prob={round(self.drop_prob, 3):0.3f}"
 
 
 class ConvNeXtBlock(nn.Module):
@@ -64,15 +64,11 @@ class ConvNeXtBlock(nn.Module):
             padding_mode="replicate",
         )  # depthwise conv
         self.norm = nn.functional.layer_norm
-        self.pwconv1 = nn.Linear(
-            out_channels, 4 * out_channels
-        )  # pointwise/1x1 convs, implemented with linear layers
+        self.pwconv1 = nn.Linear(out_channels, 4 * out_channels)  # pointwise/1x1 convs, implemented with linear layers
         self.act = nn.GELU()
         self.pwconv2 = nn.Linear(4 * out_channels, in_channels)
         self.gamma = (
-            nn.Parameter(
-                layer_scale_init_value * torch.ones((out_channels)), requires_grad=True
-            )
+            nn.Parameter(layer_scale_init_value * torch.ones((out_channels)), requires_grad=True)
             if layer_scale_init_value > 0
             else None
         )
@@ -106,9 +102,7 @@ class TimeDownsamplingBlock(nn.Module):
     def __init__(self, in_channels, out_channels, bias=True):
         super().__init__()
         self.norm = nn.functional.layer_norm
-        self.conv = nn.Conv2d(
-            in_channels, out_channels, kernel_size=(1, 2), stride=(1, 2), bias=bias
-        )
+        self.conv = nn.Conv2d(in_channels, out_channels, kernel_size=(1, 2), stride=(1, 2), bias=bias)
         self.act = nn.GELU()
 
     def forward(self, x):

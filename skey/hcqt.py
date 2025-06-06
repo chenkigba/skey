@@ -1,4 +1,5 @@
 import math
+
 import nnAudio.features.vqt
 import torch
 import torchaudio
@@ -29,9 +30,7 @@ class VQT(nnAudio.features.vqt.VQT):
         low_octave_shift = min([0] + self.bin_shifts) / bins_per_octave
         fmin = fmin * (2**low_octave_shift)
         n_bins = n_bins + max([0] + self.bin_shifts) - min([0] + self.bin_shifts)
-        super().__init__(
-            fmin=fmin, n_bins=n_bins, bins_per_octave=bins_per_octave, **kwargs
-        )
+        super().__init__(fmin=fmin, n_bins=n_bins, bins_per_octave=bins_per_octave, **kwargs)
 
     def forward(self, x, output_format="Magnitude", normalization_type="librosa"):
         vqt = super().forward(x, output_format, normalization_type)
@@ -42,9 +41,7 @@ class VQT(nnAudio.features.vqt.VQT):
             vqt_slice = vqt[:, bin_start:bin_stop, ...]
             hvqt.append(vqt_slice)
         hvqt = torch.stack(hvqt, dim=1)
-        log_hcqt = (
-            (1.0 / 80.0) * torchaudio.transforms.AmplitudeToDB(top_db=80)(hvqt)
-        ) + 1.0
+        log_hcqt = ((1.0 / 80.0) * torchaudio.transforms.AmplitudeToDB(top_db=80)(hvqt)) + 1.0
         return log_hcqt
 
 
@@ -66,16 +63,12 @@ class CropCQT(torch.nn.Module):
             Returns:
                 torch.Tensor: A batch of cropped spectrograms.
     """
+
     def __init__(self, height: int):
         super(CropCQT, self).__init__()
         self.height = height
 
-    def forward(
-        self, spectrograms: torch.Tensor, transpose: torch.Tensor
-    ) -> torch.Tensor:
+    def forward(self, spectrograms: torch.Tensor, transpose: torch.Tensor) -> torch.Tensor:
         return torch.stack(
-            [
-                s[:, int(l) : int(l) + self.height, :]
-                for s, l in zip(spectrograms, transpose)
-            ]
+            [s[:, int(start_idx) : int(start_idx) + self.height, :] for s, start_idx in zip(spectrograms, transpose)]
         )

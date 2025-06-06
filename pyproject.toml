@@ -19,13 +19,17 @@ nnAudio = "0.3.2"
 soundfile = "^0.13.1"
 
 [tool.poetry.group.dev.dependencies]
-black = "*"
-isort = "*"
+mypy = "*"
+ruff = "*"
+pytest = "*"
 pdbr = "*"
 
-[tool.isort]
-profile = "black"
-multi_line_output = 3
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["T203", "E741", "E742", "E743", "F", "I"]
+ignore = ["F401"]
 
 [tool.poetry.scripts]
 skey = "skey.cli:main"

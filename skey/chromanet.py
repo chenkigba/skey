@@ -1,7 +1,9 @@
 from typing import List
-from torch import nn
-from skey.src.convnext import ConvNeXtBlock, TimeDownsamplingBlock
+
 from einops import rearrange
+from torch import nn
+
+from skey.convnext import ConvNeXtBlock, TimeDownsamplingBlock
 
 
 class OctavePool(nn.Module):
@@ -13,13 +15,14 @@ class OctavePool(nn.Module):
 
     Forward:
         Args:
-            x (Tensor): Input tensor of shape (batch_size, channel, H, W), 
+            x (Tensor): Input tensor of shape (batch_size, channel, H, W),
                         where H is the height representing frequency bins.
 
         Returns:
-            Tensor: Output tensor of shape (batch_size, channel, bins_per_octave, W), 
+            Tensor: Output tensor of shape (batch_size, channel, bins_per_octave, W),
                     where the frequency axis is averaged across octaves.
     """
+
     def __init__(self, bins_per_octave: int):
         super().__init__()
         self.bins_per_octave = bins_per_octave
@@ -49,6 +52,7 @@ class ChromaNet(nn.Module):
         Returns:
             Tensor: Output tensor of shape (batch_size, 24), representing the processed chroma features.
     """
+
     def __init__(
         self,
         n_bins: int,

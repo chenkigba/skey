@@ -2,7 +2,6 @@ import csv
 import glob
 import logging
 import os
-import urllib.request
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Tuple
 
@@ -11,10 +10,12 @@ import torch
 import torchaudio
 from tqdm import tqdm
 
-from .src.chromanet import ChromaNet
-from .src.hcqt import VQT, CropCQT
+from .chromanet import ChromaNet
+from .hcqt import VQT, CropCQT
 
 logging.basicConfig(level=logging.INFO)
+
+DEFAULT_CHECKPOINT_PATH = Path(__file__).parent / "models/skey.pt"
 
 key_map = {
     0: "A Major",
@@ -42,17 +43,6 @@ key_map = {
     22: "A minor",
     23: "Bb minor",
 }
-
-
-def download_checkpoint_if_missing(path: str = "./models/skey.pt"):
-    path = os.path.expanduser(path)
-    if not os.path.exists(path):
-        print("Checkpoint not found. Downloading from GitHub...")
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        url = "https://github.com/deezer/s-key/raw/main/skey.pt"
-        urllib.request.urlretrieve(url, path)
-        print(f"✅ Checkpoint downloaded to {path}")
-    return path
 
 
 def yield_audio_paths(paths: List[str]) -> Iterator[Dict[str, Any]]:
@@ -201,26 +191,34 @@ def infer_key(
         return "error"
 
 
-def load_checkpoint(path: str) -> Dict[str, Any]:
+def load_checkpoint(checkpoint_path: str | Path | None = DEFAULT_CHECKPOINT_PATH) -> Dict[str, Any]:
     """
-    Loads a checkpoint file from the specified path.
+    Loads a checkpoint file from the specified checkpoint_path.
 
     Args:
-        path (str): Path to the checkpoint file.
+        checkpoint_path (str): Path to the checkpoint file.
 
     Returns:
         Dict[str, Any]: Loaded checkpoint dictionary.
     """
-    logging.info(f"Loading checkpoint from {path}")
-    return torch.load(path, map_location="cpu")
+
+    if checkpoint_path is None:
+        checkpoint_path = DEFAULT_CHECKPOINT_PATH
+
+    logging.info(f"Loading checkpoint from {checkpoint_path}")
+    if not os.path.exists(str(checkpoint_path)):
+        raise FileNotFoundError(f"Checkpoint file {checkpoint_path} does not exist.")
+    return torch.load(checkpoint_path, map_location="cpu")
 
 
-def key_detection(ckpt_path: str, audio_path: str, extension: str = "wav", device: str = "cpu") -> None:
+def detect_key(
+    audio_path: str, extension: str = "wav", device: str = "cpu", ckpt_path: str | Path = DEFAULT_CHECKPOINT_PATH
+) -> None:
     """
     Detects the musical key of audio files using a pre-trained model.
 
     Args:
-        ckpt_path (str): Path to the model checkpoint file. Use "auto" to download the default checkpoint.
+        ckpt_path (str): Path to the model checkpoint file.
         audio_path (str): Path to the audio file or directory containing audio files.
         extension (str, optional): File extension of audio files to process. No need to pass this argument when audio_path is a single audio file. Defaults to "wav".
         device (str, optional): Device to perform inference on ("cpu", "cuda", or "mps"). Defaults to "cpu".
@@ -233,8 +231,7 @@ def key_detection(ckpt_path: str, audio_path: str, extension: str = "wav", devic
         device = "cpu"
 
     d = torch.device(device)
-    if ckpt_path.lower() == "auto":
-        ckpt_path = download_checkpoint_if_missing()
+
     ckpt = load_checkpoint(ckpt_path)
     sr = ckpt["audio"]["sr"]
 
