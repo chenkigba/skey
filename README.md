@@ -26,22 +26,29 @@ pip install .
 ### 🔧 Command Line Interface (CLI)
 
 ```bash
-skey path/to/audio_dir --checkpoint path/to/model.pt --ext mp3 --device cpu
+skey path/to/audio
 ```
 
-If `--checkpoint` is not provided, the default model will be used.
+This will run key detection on the specified audio file or directory using the default model and settings.
+
+To specify additional options, use the following arguments:
 
 ```bash
-skey path/to/audio_dir --ext mp3 --device cpu
+skey path/to/audio --checkpoint path/to/model.pt --ext mp3 --device cpu
 ```
+
+- `--checkpoint`: Path to a custom model checkpoint (`.pt`). If not provided, the default model is used.
+- `--ext`: Audio file extension (default: `wav`), if `path/to/audio` is a directory. Else infers the extension from the file. Supports all formats readable by torchaudio.
+- `--device`: Device to run on (default: `cpu`, e.g., `cuda`, `mps`).
+
 
 **Arguments**:
 
 | Argument                | Description                                               |
 | ----------------------- | --------------------------------------------------------- |
-| `path/to/audio_dir`     | Path to directory with audio files or a single audio file |
+| `path/to/audio`     | Path to directory with audio files or a single audio file |
 | `--checkpoint`          | Path to model checkpoint (`.pt`). Loads default if not provided. |
-| `--ext`                 | Audio file extension (default: `wav`, supports all formats that can be read by torchaudio) if `path/to/audio_dir` is a directory |
+| `--ext`                 | Audio file extension (default: `wav`, supports all formats that can be read by torchaudio) if `path/to/audio` is a directory |
 | `--device`              | Device to run on (default: `cpu`, e.g., `cuda`, `mps`)                  |
 
 
@@ -51,7 +58,7 @@ skey path/to/audio_dir --ext mp3 --device cpu
 from skey import detect_key
 
 detect_key(
-    audio_dir="path/to/audio_dir",
+    audio_dir="path/to/audio",
     extension="mp3",
     device="cpu"
 )
