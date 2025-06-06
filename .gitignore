@@ -6,6 +6,7 @@ __pycache__/
 .vscode/
 core
 .fuse_*
+Makefile
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

@@ -1,6 +1,6 @@
 # S-KEY
 
-`skey` is a Python package for state-of-the-art automatic **musical key detection** from audio recordings, based on the S-KEY model proposed by Yuexuan Kong et al. The package provides an efficient pipeline for loading audio and inferring musical key using a trained deep learning model ChromaNet.
+`skey` is a Python package for state-of-the-art automatic **musical key detection** from audio recordings, based on the S-KEY model proposed by Yuexuan Kong et al. The package provides an efficient pipeline for loading audio and inferring musical key using a trained deep learning model ChromaNet. It will be made into a PyPI package soon.
 
 - 📄 [S-KEY: Self-supervised Learning of Major and Minor Keys from Audio](https://arxiv.org/abs/2501.12907)  
 - ✅ Accepted at [ICASSP 2025](https://ieeexplore.ieee.org/xpl/conhome/10887540/proceeding)
@@ -14,11 +14,10 @@
 - 🔌 CPU and GPU support
 
 
-
 ## Installation
 
 ```bash
-pip install .
+poetry install
 ```
 
 ## Usage
@@ -26,7 +25,7 @@ pip install .
 ### 🔧 Command Line Interface (CLI)
 
 ```bash
-skey path/to/audio
+poetry skey path/to/audio --device cpu
 ```
 
 This will run key detection on the specified audio file or directory using the default model and settings.
@@ -34,7 +33,7 @@ This will run key detection on the specified audio file or directory using the d
 To specify additional options, use the following arguments:
 
 ```bash
-skey path/to/audio --checkpoint path/to/model.pt --ext mp3 --device cpu
+poetry skey path/to/audio --checkpoint path/to/model.pt --ext mp3 --device cpu
 ```
 
 - `--checkpoint`: Path to a custom model checkpoint (`.pt`). If not provided, the default model is used.
@@ -77,21 +76,28 @@ detect_key(
 skey
 ├── Dockerfile
 ├── LICENSE
-├── README.md
+├── Makefile
+├── poetry.lock
 ├── pyproject.toml
+├── README.md
 ├── skey
 │   ├── __init__.py
+│   ├── chromanet.py
 │   ├── cli.py
+│   ├── convnext.py
+│   ├── hcqt.py
 │   ├── key_detection.py
-│   └── src
-│       ├── chromanet.py
-│       ├── convnext.py
-│       └── hcqt.py
+│   ├── models
+│   │   └── skey.pt
+├── tests
+│   ├── nocturne_n02_in_e-flat_major.mp3
+│   └── test_detect_key.py
 └── training_utils
     ├── config
     │   └── skey.gin
-    ├── skey.py
-    └── skey_loss.py
+    ├── skey_loss.py
+    └── skey.py
+
 ```
 
 ⚠️ The `training_utils/` directory is **not used** in the `skey` package for inference. However, it is **essential** if you plan to **retrain the model**. It contains:
