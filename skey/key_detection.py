@@ -73,7 +73,7 @@ def load_audio(song_path: str, sr: float, mono: bool = True, normalize: bool = T
         torch.Tensor: A tensor containing the audio waveform. If loading fails,
                       returns a tensor of zeros with shape (1, 1).
     """
-    if not Path(song_path).is_file():
+    if not Path(song_path).exists():
         raise FileNotFoundError(f"File {song_path} not found.")
 
     try:
@@ -247,6 +247,9 @@ def detect_key(
         if os.path.isfile(audio_path)
         else glob.glob(os.path.join(audio_path, f"**/*.{extension}"), recursive=True)
     )
+
+    if len(audio_files) == 0:
+        raise FileNotFoundError(f"No audio files found in {audio_path}.")
 
     logging.info(f"\n🔑 Computing key for {len(audio_files)} audio files on {d}...\n")
 
