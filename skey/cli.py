@@ -19,4 +19,4 @@ def main():
 
     ckpt_path = args.checkpoint
 
-    detect_key(audio_path=args.audio_dir, extension=args.ext, device=args.device, ckpt_path=ckpt_path)
+    detect_key(audio_path=args.audio_dir, extension=args.ext, device=args.device, ckpt_path=ckpt_path, cli=True)

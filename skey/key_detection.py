@@ -1,4 +1,3 @@
-import csv
 import glob
 import logging
 import os
@@ -96,7 +95,7 @@ def load_audio(song_path: str, sr: float, mono: bool = True, normalize: bool = T
         if max_val > 0:
             waveform = waveform / max_val
 
-    print("Waveform shape:", waveform.shape)
+    # logging.info(f"Waveform shape: {waveform.shape}")
     return waveform
 
 
@@ -208,12 +207,16 @@ def load_checkpoint(checkpoint_path: str | Path | None = DEFAULT_CHECKPOINT_PATH
     logging.info(f"Loading checkpoint from {checkpoint_path}")
     if not os.path.exists(str(checkpoint_path)):
         raise FileNotFoundError(f"Checkpoint file {checkpoint_path} does not exist.")
-    return torch.load(checkpoint_path, map_location="cpu")
+    return torch.load(checkpoint_path, map_location="cpu", weights_only=False)
 
 
 def detect_key(
-    audio_path: str, extension: str = "wav", device: str = "cpu", ckpt_path: str | Path = DEFAULT_CHECKPOINT_PATH
-) -> None:
+    audio_path: str,
+    extension: str = "wav",
+    device: str = "cpu",
+    ckpt_path: str | Path = DEFAULT_CHECKPOINT_PATH,
+    cli: bool = False,
+) -> list[str] | None:
     """
     Detects the musical key of audio files using a pre-trained model.
 
@@ -222,9 +225,10 @@ def detect_key(
         audio_path (str): Path to the audio file or directory containing audio files.
         extension (str, optional): File extension of audio files to process. No need to pass this argument when audio_path is a single audio file. Defaults to "wav".
         device (str, optional): Device to perform inference on ("cpu", "cuda", or "mps"). Defaults to "cpu".
+        cli (bool, optional): If True, prints results to console. If False, returns results. Defaults to False.
 
     Returns:
-        None: Prints the predicted key(s) and saves results to a CSV file if multiple files are processed.
+        list[str] | None: List of predicted keys for the audio files. Returns None if no audio files are found.
     """
     if device != "cpu" and not torch.cuda.is_available() and not torch.backends.mps.is_available():
         logging.warning("CUDA and MPS not available. Falling back to CPU.")
@@ -244,25 +248,17 @@ def detect_key(
         else glob.glob(os.path.join(audio_path, f"**/*.{extension}"), recursive=True)
     )
 
-    print(f"\n🔑 Computing key for {len(audio_files)} audio files on {d}...\n")
+    logging.info(f"\n🔑 Computing key for {len(audio_files)} audio files on {d}...\n")
 
-    results = {
-        path: infer_key(hcqt, chromanet, crop_fn, load_audio(path, sr).to(d), d)
+    results = [
+        infer_key(hcqt, chromanet, crop_fn, load_audio(path, sr).to(d), d)
         for path in tqdm(audio_files, desc="Processing")
-    }
+    ]
 
-    if len(audio_files) == 1:
-        print(f"\n✅ Predicted key for {audio_files[0]}: {results[audio_files[0]]}\n")
+    if cli:
+        print("\n✅ Predicted keys for audio files:\n")
+        for path, key in zip(audio_files, results):
+            print(f"{path}: {key}")
+        print()
     else:
-        out_dir = os.path.join(audio_path, "prediction")
-        os.makedirs(out_dir, exist_ok=True)
-        out_csv_path = os.path.join(out_dir, "predictions.csv")
-
-        # Save results to a CSV file
-        with open(out_csv_path, mode="w", newline="") as file:
-            writer = csv.writer(file)
-            writer.writerow(["Audio File", "Predicted Key"])
-            for path, key in results.items():
-                writer.writerow([path, key])
-
-        print(f"\n✅ Predictions saved to: {out_csv_path}\n")
+        return results
