@@ -3,11 +3,12 @@ import glob
 import logging
 import os
 import urllib.request
+from pathlib import Path
 from typing import Any, Dict, Iterator, List, Tuple
 
-import librosa
 import numpy as np
 import torch
+import torchaudio
 from tqdm import tqdm
 
 from .src.chromanet import ChromaNet
@@ -69,9 +70,7 @@ def yield_audio_paths(paths: List[str]) -> Iterator[Dict[str, Any]]:
         yield {"idx": idx, "song_path": paths[idx]}
 
 
-def load_audio(
-    song_path: str, sr: float, mono: bool = True, normalize: bool = True
-) -> torch.Tensor:
+def load_audio(song_path: str, sr: float, mono: bool = True, normalize: bool = True) -> torch.Tensor:
     """
     Loads an audio file and returns its waveform as a PyTorch tensor.
 
@@ -82,27 +81,32 @@ def load_audio(
         normalize (bool, optional): Whether to normalize the waveform. Defaults to True.
 
     Returns:
-        torch.Tensor: A tensor containing the audio waveform. If loading fails, 
+        torch.Tensor: A tensor containing the audio waveform. If loading fails,
                       returns a tensor of zeros with shape (1, 1).
     """
+    if not Path(song_path).is_file():
+        raise FileNotFoundError(f"File {song_path} not found.")
+
     try:
-        waveform_np, sr = librosa.load(song_path, sr=sr, mono=mono)
+        waveform, waveform_sr = torchaudio.load(song_path, backend="soundfile")
     except Exception as e:
-        logging.warning(f"Failed to load {song_path}: {e}")
-        return torch.zeros(1, 1)
+        logging.error(f"Failed to load {song_path}: {e}")
+        raise ValueError(f"Could not load audio file {song_path}: {e}")
 
-    if waveform_np.ndim == 1:
-        waveform_np = np.expand_dims(waveform_np, axis=0)
-    if mono:
-        waveform_np = np.mean(waveform_np, axis=0, keepdims=True)
+    # Resample if necessary
+    if waveform_sr != sr:
+        waveform = torchaudio.transforms.Resample(orig_freq=waveform_sr, new_freq=sr)(waveform)
 
-    waveform = torch.from_numpy(waveform_np).float()
+    # Convert to mono if specified
+    if mono == True and waveform.shape[0] > 1:
+        waveform = torch.mean(waveform, dim=0, keepdim=True)
 
     if normalize:
         max_val = torch.max(torch.abs(waveform))
         if max_val > 0:
             waveform = waveform / max_val
 
+    print("Waveform shape:", waveform.shape)
     return waveform
 
 
@@ -118,6 +122,7 @@ class AudioDataset(torch.utils.data.IterableDataset):
     Yields:
         Tuple[torch.Tensor, str]: A tuple containing the audio tensor and the file path.
     """
+
     def __init__(self, paths: List[str], sr: int, device: torch.device):
         self.paths = paths
         self.sr = sr
@@ -130,9 +135,7 @@ class AudioDataset(torch.utils.data.IterableDataset):
                 yield audio, data["song_path"]
 
 
-def load_model_components(
-    ckpt: Dict[str, Any], device: torch.device
-) -> Tuple[VQT, ChromaNet, CropCQT]:
+def load_model_components(ckpt: Dict[str, Any], device: torch.device) -> Tuple[VQT, ChromaNet, CropCQT]:
     """
     Loads model components (VQT, ChromaNet, and CropCQT) and initializes them with checkpoint data.
 
@@ -157,17 +160,9 @@ def load_model_components(
         temperature=1,
     ).to(device)
 
-    hcqt.load_state_dict(
-        {k.replace("hcqt.", ""): v for k, v in ckpt["stone"].items() if "hcqt" in k}
-    )
+    hcqt.load_state_dict({k.replace("hcqt.", ""): v for k, v in ckpt["stone"].items() if "hcqt" in k})
 
-    chromanet.load_state_dict(
-        {
-            k.replace("chromanet.", ""): v
-            for k, v in ckpt["stone"].items()
-            if "chromanet" in k
-        }
-    )
+    chromanet.load_state_dict({k.replace("chromanet.", ""): v for k, v in ckpt["stone"].items() if "chromanet" in k})
 
     hcqt.eval()
     chromanet.eval()
@@ -220,9 +215,7 @@ def load_checkpoint(path: str) -> Dict[str, Any]:
     return torch.load(path, map_location="cpu")
 
 
-def key_detection(
-    ckpt_path: str, audio_path: str, extension: str = "wav", device: str = "cpu"
-) -> None:
+def key_detection(ckpt_path: str, audio_path: str, extension: str = "wav", device: str = "cpu") -> None:
     """
     Detects the musical key of audio files using a pre-trained model.
 
@@ -235,11 +228,7 @@ def key_detection(
     Returns:
         None: Prints the predicted key(s) and saves results to a CSV file if multiple files are processed.
     """
-    if (
-        device != "cpu"
-        and not torch.cuda.is_available()
-        and not torch.backends.mps.is_available()
-    ):
+    if device != "cpu" and not torch.cuda.is_available() and not torch.backends.mps.is_available():
         logging.warning("CUDA and MPS not available. Falling back to CPU.")
         device = "cpu"
 
@@ -252,7 +241,11 @@ def key_detection(
     hcqt, chromanet, crop_fn = load_model_components(ckpt, d)
 
     # Determine if input is a single file or a directory
-    audio_files = [audio_path] if os.path.isfile(audio_path) else glob.glob(os.path.join(audio_path, f"**/*.{extension}"), recursive=True)
+    audio_files = (
+        [audio_path]
+        if os.path.isfile(audio_path)
+        else glob.glob(os.path.join(audio_path, f"**/*.{extension}"), recursive=True)
+    )
 
     print(f"\n🔑 Computing key for {len(audio_files)} audio files on {d}...\n")
 
