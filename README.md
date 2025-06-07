@@ -28,7 +28,7 @@ poetry install
 poetry skey path/to/audio --device cpu
 ```
 
-This will run key detection on the specified audio file or directory using the default model and settings.
+This will run key detection on the specified audio file or directory using the default model and settings. The prediction will be printed if the path is an audio file, will be saved into a .csv file if the path is a directory.
 
 To specify additional options, use the following arguments:
 

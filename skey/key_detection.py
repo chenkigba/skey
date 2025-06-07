@@ -1,6 +1,7 @@
 import glob
 import logging
 import os
+import csv
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Tuple
 
@@ -258,10 +259,20 @@ def detect_key(
         for path in tqdm(audio_files, desc="Processing")
     ]
 
-    if cli:
-        print("\n✅ Predicted keys for audio files:\n")
-        for path, key in zip(audio_files, results):
-            print(f"{path}: {key}")
-        print()
+    if len(audio_files) == 1:
+        print(f"\n✅ Predicted key for {audio_files[0]}: {results[0]}\n")
     else:
+        out_dir = os.path.join(audio_path, "prediction")
+        os.makedirs(out_dir, exist_ok=True)
+        out_csv_path = os.path.join(out_dir, "predictions.csv")
+
+        # Save results to a CSV file
+        with open(out_csv_path, mode="w", newline="") as file:
+            writer = csv.writer(file)
+            writer.writerow(["Audio File", "Predicted Key"])
+            for i, key in enumerate(results):
+                writer.writerow([audio_files[i], key])
+        print(f"\n✅ Predictions saved to: {out_csv_path}\n")
+
+    if not cli:
         return results
