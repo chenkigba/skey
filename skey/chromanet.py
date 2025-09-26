@@ -92,7 +92,6 @@ class ChromaNet(nn.Module):
         self.classifier = nn.Conv2d(out_channel, 2, kernel_size=(1, 1))
         self.flatten = nn.Flatten()
         self.batch_norm = nn.BatchNorm2d(2, affine=False)
-        self.softmax = nn.Softmax(dim=-1)
 
     def forward(self, x):
         block_zip = zip(self.convnext_blocks, self.time_downsampling_blocks)
@@ -104,7 +103,8 @@ class ChromaNet(nn.Module):
         x = self.classifier(x)
         x = self.batch_norm(x)
         x = self.flatten(x)
-        x = self.softmax(x / self.temperature)
+        # Temperature scaling kept; downstream argmax does not require softmax
+        x = x / self.temperature
         assert x.shape[1] == 24
 
         return x
