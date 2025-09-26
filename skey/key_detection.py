@@ -2,6 +2,7 @@ import glob
 import logging
 import os
 import csv
+import contextlib
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Tuple
 
@@ -182,10 +183,19 @@ def infer_key(
     """
     new_batch = batch.unsqueeze(0).to(device)
     try:
-        with torch.no_grad():
-            cropped = crop_fn(hcqt(new_batch), torch.zeros(1).to(device))
-            logits = chromanet(cropped)
-            return key_map[int(torch.mean(logits, dim=0).argmax())]
+        # inference mode + autocast for GPU/MPS
+        if device.type == "cuda":
+            autocast_ctx = torch.cuda.amp.autocast(dtype=torch.float16)
+        elif device.type == "mps":
+            autocast_ctx = torch.autocast(device_type="mps", dtype=torch.float16)
+        else:
+            autocast_ctx = contextlib.nullcontext()
+
+        with torch.inference_mode():
+            with autocast_ctx:
+                cropped = crop_fn(hcqt(new_batch), torch.zeros(1, device=device))
+                logits = chromanet(cropped)
+                return key_map[int(logits.squeeze(0).argmax().item())]
     except Exception as e:
         logging.warning(f"Inference failed (likely short audio): {e}")
         return "error"
@@ -255,7 +265,7 @@ def detect_key(
     logging.info(f"\n🔑 Computing key for {len(audio_files)} audio files on {d}...\n")
 
     results = [
-        infer_key(hcqt, chromanet, crop_fn, load_audio(path, sr).to(d), d)
+        infer_key(hcqt, chromanet, crop_fn, load_audio(path, sr), d)
         for path in tqdm(audio_files, desc="Processing")
     ]
 
