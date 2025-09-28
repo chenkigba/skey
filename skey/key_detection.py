@@ -241,16 +241,7 @@ def detect_key(
     Returns:
         list[str] | None: List of predicted keys for the audio files. Returns None if no audio files are found.
     """
-    if device != "cpu" and not torch.cuda.is_available() and not torch.backends.mps.is_available():
-        logging.warning("CUDA and MPS not available. Falling back to CPU.")
-        device = "cpu"
-
-    d = torch.device(device)
-
-    ckpt = load_checkpoint(ckpt_path)
-    sr = ckpt["audio"]["sr"]
-
-    hcqt, chromanet, crop_fn = load_model_components(ckpt, d)
+    d, sr, hcqt, chromanet, crop_fn = setup(device, ckpt_path)
 
     # Determine if input is a single file or a directory
     audio_files = (
@@ -286,3 +277,16 @@ def detect_key(
 
     if not cli:
         return results
+
+def setup(device, ckpt_path):
+    if device != "cpu" and not torch.cuda.is_available() and not torch.backends.mps.is_available():
+        logging.warning("CUDA and MPS not available. Falling back to CPU.")
+        device = "cpu"
+
+    d = torch.device(device)
+
+    ckpt = load_checkpoint(ckpt_path)
+    sr = ckpt["audio"]["sr"]
+
+    hcqt, chromanet, crop_fn = load_model_components(ckpt, d)
+    return d,sr,hcqt,chromanet,crop_fn
