@@ -1,8 +1,10 @@
+import contextlib
+import csv
 import glob
 import logging
 import os
-import csv
-import contextlib
+import threading
+from concurrent.futures import Future, ThreadPoolExecutor
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Tuple
 
@@ -13,6 +15,65 @@ from tqdm import tqdm
 
 from .chromanet import ChromaNet
 from .hcqt import VQT, CropCQT
+
+# 全局：单线程执行器 + 预加载 Future + 路径缓存，确保幂等与单次加载
+_executor: ThreadPoolExecutor | None = None
+_global_future: Future | None = None
+_global_ckpt_path: str | Path | None = None
+_lock = threading.Lock()
+
+def _select_device(explicit_device: str | None) -> torch.device:
+    """优先使用显式指定；否则自动选择（CUDA > MPS > CPU）。"""
+    if explicit_device:
+        if explicit_device != "cpu" and not torch.cuda.is_available() and not torch.backends.mps.is_available():
+            logging.warning("CUDA and MPS not available. Falling back to CPU.")
+            return torch.device("cpu")
+        return torch.device(explicit_device)
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    if torch.backends.mps.is_available():
+        return torch.device("mps")
+    return torch.device("cpu")
+
+def _configure_torch_backends(device: torch.device) -> None:
+    """与 MelBandRoformer 一致：启用 cudnn.benchmark/TF32 等轻量优化。"""
+    try:
+        if device.type == "cuda":
+            torch.backends.cudnn.benchmark = True
+            torch.backends.cuda.matmul.allow_tf32 = True
+            torch.backends.cudnn.allow_tf32 = True
+    except Exception as e:
+        logging.debug(f"Ignore backend tuning error: {e}")
+
+def _load_setup_impl(device_str: str | None, ckpt_path: str | Path):
+    d = _select_device(device_str)
+    _configure_torch_backends(d)
+    ckpt = load_checkpoint(ckpt_path)
+    sr = ckpt["audio"]["sr"]
+    hcqt, chromanet, crop_fn = load_model_components(ckpt, d)
+    return d, sr, hcqt, chromanet, crop_fn
+
+def preload(ckpt_path: str | Path | None = None, device: str | None = None) -> Future:
+    """
+    后台异步预加载 skey 模型，返回全局 Future（幂等）。
+    - 首次调用：启动单线程线程池任务并缓存
+    - 后续调用：复用已存在的 Future；如传入不同 ckpt 路径，将告警并忽略
+    """
+    global _executor, _global_future, _global_ckpt_path
+    if ckpt_path is None:
+        ckpt_path = DEFAULT_CHECKPOINT_PATH
+    with _lock:
+        if _global_future is not None:
+            if str(ckpt_path) != str(_global_ckpt_path):
+                logging.warning(
+                    f"skey: 已有预加载任务存在（ckpt={_global_ckpt_path}），忽略新的 ckpt 请求：{ckpt_path}"
+                )
+            return _global_future
+        _executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="skey-preload")
+        _global_ckpt_path = str(ckpt_path)
+        _global_future = _executor.submit(_load_setup_impl, device, ckpt_path)
+        logging.info(f"skey: 已启动后台预加载（ckpt={ckpt_path}）")
+        return _global_future
 
 logging.basicConfig(level=logging.INFO)
 
@@ -279,14 +340,19 @@ def detect_key(
         return results
 
 def setup_skey(device, ckpt_path):
-    if device != "cpu" and not torch.cuda.is_available() and not torch.backends.mps.is_available():
-        logging.warning("CUDA and MPS not available. Falling back to CPU.")
-        device = "cpu"
-
-    d = torch.device(device)
-
-    ckpt = load_checkpoint(ckpt_path)
-    sr = ckpt["audio"]["sr"]
-
-    hcqt, chromanet, crop_fn = load_model_components(ckpt, d)
-    return d,sr,hcqt,chromanet,crop_fn
+    """
+    统一推理侧入口：
+    - 若已有全局 Future（预加载）：阻塞等待并复用模型；如路径不一致，仅告警
+    - 否则：同步加载一次
+    """
+    global _global_future, _global_ckpt_path
+    with _lock:
+        fut = _global_future
+        pre_ckpt = _global_ckpt_path
+    if fut is not None:
+        if str(ckpt_path) != str(pre_ckpt):
+            logging.warning(
+                f"skey: 预加载 ckpt 与当前请求不一致（preloaded={pre_ckpt}, requested={ckpt_path}），复用已加载模型。"
+            )
+        return fut.result()
+    return _load_setup_impl(device, ckpt_path)
